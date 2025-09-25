@@ -39,6 +39,17 @@
             background-color: #1f2937;
             border-left: 3px solid #3b82f6;
         }
+        .webhook-item.read {
+            background-color: #1f2937;
+            opacity: 0.7;
+        }
+        .webhook-item.read:hover {
+            background-color: #374151;
+            opacity: 0.8;
+        }
+        .webhook-item.unread {
+            background-color: #2d3142;
+        }
         .request-details {
             background-color: #1f2937;
             border-radius: 8px;
@@ -166,9 +177,10 @@
                     <div class="card-body p-0" style="overflow-y: auto;">
                         <div id="webhook-list">
                             @forelse($webhooks as $webhook)
-                            <div class="webhook-item p-3 border-bottom border-secondary" 
+                            <div class="webhook-item p-3 border-bottom border-secondary {{ $webhook->isRead() ? 'read' : 'unread' }}" 
                                  data-id="{{ $webhook->id }}" 
                                  data-method="{{ $webhook->method }}"
+                                 data-read="{{ $webhook->isRead() ? 'true' : 'false' }}"
                                  onclick="showWebhookDetails({{ $webhook->id }})">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="flex-grow-1">
@@ -177,6 +189,9 @@
                                                 {{ $webhook->method }}
                                             </span>
                                             <small class="text-muted-custom">{{ $webhook->created_at->format('d/m H:i:s') }}</small>
+                                            @if(!$webhook->isRead())
+                                                <span class="badge bg-primary ms-2" style="font-size: 0.6rem;">NOVO</span>
+                                            @endif
                                         </div>
                                         <div class="text-truncate" style="max-width: 250px;">
                                             <small>{{ $webhook->ip_address }}</small>
@@ -225,7 +240,7 @@
                                             <p><strong>Data:</strong> {{ $firstWebhook->created_at->format('d/m/Y, H:i:s') }}</p>
                                         </div>
                                         <div class="col-md-6">
-                                            <p><strong>Host:</strong> {{ parse_url($firstWebhook->url, PHP_URL_HOST) }}</p>
+                                            <p><strong>Host de Origem:</strong> {{ $firstWebhook->ip_address }}</p>
                                             <p><strong>Tamanho:</strong> {{ $firstWebhook->formatted_size }}</p>
                                             <p><strong>Tempo de Resposta:</strong> <span class="text-success">{{ number_format($firstWebhook->created_at->diffInMilliseconds(now())) }}ms</span></p>
                                         </div>
@@ -336,10 +351,15 @@
                     second: '2-digit'
                 });
 
+                const isRead = webhook.read_at !== null;
+                const readClass = isRead ? 'read' : 'unread';
+                const newBadge = isRead ? '' : '<span class="badge bg-primary ms-2" style="font-size: 0.6rem;">NOVO</span>';
+
                 return `
-                    <div class="webhook-item p-3 border-bottom border-secondary ${currentWebhookId == webhook.id ? 'active' : ''}" 
+                    <div class="webhook-item p-3 border-bottom border-secondary ${readClass} ${currentWebhookId == webhook.id ? 'active' : ''}" 
                          data-id="${webhook.id}" 
                          data-method="${webhook.method}"
+                         data-read="${isRead}"
                          onclick="showWebhookDetails(${webhook.id})">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
@@ -348,6 +368,7 @@
                                         ${webhook.method}
                                     </span>
                                     <small class="text-muted-custom">${formattedDate}</small>
+                                    ${newBadge}
                                 </div>
                                 <div class="text-truncate" style="max-width: 250px;">
                                     <small>${webhook.ip_address}</small>
@@ -382,13 +403,28 @@
             document.querySelectorAll('.webhook-item').forEach(item => {
                 item.classList.remove('active');
             });
-            document.querySelector(`[data-id="${id}"]`).classList.add('active');
+            
+            const clickedItem = document.querySelector(`[data-id="${id}"]`);
+            clickedItem.classList.add('active');
 
             // Fetch webhook details
             fetch(`/api/webhooks/${id}`)
                 .then(response => response.json())
                 .then(webhook => {
                     displayWebhookDetails(webhook);
+                    
+                    // Marcar como lido visualmente se ainda não estava
+                    if (!clickedItem.classList.contains('read')) {
+                        clickedItem.classList.remove('unread');
+                        clickedItem.classList.add('read');
+                        clickedItem.dataset.read = 'true';
+                        
+                        // Remover badge "NOVO"
+                        const newBadge = clickedItem.querySelector('.badge.bg-primary');
+                        if (newBadge) {
+                            newBadge.remove();
+                        }
+                    }
                 })
                 .catch(error => console.error('Erro ao carregar detalhes:', error));
         }
@@ -404,7 +440,14 @@
                 second: '2-digit'
             });
 
-            const url = new URL(webhook.url);
+            // Extrair host da URL para exibição adicional se necessário
+            let urlHost = '';
+            try {
+                const url = new URL(webhook.url);
+                urlHost = url.hostname;
+            } catch (e) {
+                urlHost = 'N/A';
+            }
 
             const detailsHTML = `
                 <div class="request-details p-3 mb-3">
@@ -416,12 +459,20 @@
                             <p><strong>Data:</strong> ${formattedDate}</p>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>Host:</strong> ${url.hostname}</p>
+                            <p><strong>Host de Origem:</strong> ${webhook.ip_address}</p>
                             <p><strong>Tamanho:</strong> ${formatBytes(webhook.size)}</p>
                             <p><strong>Tempo de Resposta:</strong> <span class="text-success">${Math.abs(Date.now() - new Date(webhook.created_at).getTime())}ms</span></p>
                         </div>
                     </div>
-                    <p><strong>URL:</strong> <code>${webhook.url}</code></p>
+                    <p><strong>URL Chamada:</strong> <code>${webhook.url}</code></p>
+                    ${webhook.read_at ? `<p><strong>Lido em:</strong> <small class="text-info">${new Date(webhook.read_at).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    })}</small></p>` : ''}
                 </div>
 
                 <div class="request-details p-3 mb-3">

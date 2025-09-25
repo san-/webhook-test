@@ -14,13 +14,15 @@ class Webhook extends Model
         'ip_address',
         'size',
         'headers',
-        'body'
+        'body',
+        'read_at'
     ];
 
     protected $casts = [
         'headers' => 'array',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'read_at' => 'datetime'
     ];
 
     // Scope para buscar webhooks das últimas 24 horas
@@ -39,6 +41,18 @@ class Webhook extends Model
     public function scopeLastHour($query)
     {
         return $query->where('created_at', '>=', Carbon::now()->subHour());
+    }
+
+    // Marcar webhook como lido
+    public function markAsRead()
+    {
+        $this->update(['read_at' => Carbon::now()]);
+    }
+
+    // Verificar se o webhook foi lido
+    public function isRead()
+    {
+        return !is_null($this->read_at);
     }
 
     // Accessor para formatar o tamanho

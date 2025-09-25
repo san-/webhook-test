@@ -32,7 +32,7 @@ class WebhookController extends Controller
         $webhook = Webhook::create([
             'method' => $request->method(),
             'url' => $request->fullUrl(),
-            'ip_address' => $request->ip(),
+            'ip_address' => $this->getRealIpAddress($request),
             'size' => strlen($request->getContent()),
             'headers' => $request->headers->all(),
             'body' => $request->getContent()
@@ -118,6 +118,12 @@ class WebhookController extends Controller
     public function show($id)
     {
         $webhook = Webhook::findOrFail($id);
+        
+        // Marcar como lido quando visualizado
+        if (!$webhook->isRead()) {
+            $webhook->markAsRead();
+        }
+        
         return response()->json($webhook);
     }
 
@@ -135,5 +141,39 @@ class WebhookController extends Controller
             // Log da ação para debug (opcional)
             Log::info("Limpeza automática executada: {$removedCount} webhooks antigos foram removidos. Total atual: " . ($totalWebhooks - $removedCount));
         }
+    }
+
+    /**
+     * Obter o IP real da requisição considerando proxies e load balancers
+     */
+    private function getRealIpAddress($request)
+    {
+        // Lista de headers que podem conter o IP real
+        $ipHeaders = [
+            'HTTP_CF_CONNECTING_IP',     // Cloudflare
+            'HTTP_X_REAL_IP',            // Nginx proxy
+            'HTTP_X_FORWARDED_FOR',      // Standard forwarded for
+            'HTTP_X_FORWARDED',          // Forwarded
+            'HTTP_X_CLUSTER_CLIENT_IP',  // Cluster
+            'HTTP_CLIENT_IP',            // Client IP
+            'HTTP_FORWARDED_FOR',        // Forwarded for
+            'HTTP_FORWARDED',            // Forwarded
+            'REMOTE_ADDR'                // Default
+        ];
+
+        foreach ($ipHeaders as $header) {
+            if ($request->server($header)) {
+                $ips = explode(',', $request->server($header));
+                $ip = trim($ips[0]);
+                
+                // Validar se é um IP válido e não local
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                    return $ip;
+                }
+            }
+        }
+
+        // Se não encontrou IP válido, usar o padrão
+        return $request->ip();
     }
 }
