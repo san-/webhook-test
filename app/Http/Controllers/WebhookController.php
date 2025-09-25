@@ -1,0 +1,119 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\Webhook;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
+
+class WebhookController extends Controller
+{
+    // Exibe o dashboard principal
+    public function dashboard()
+    {
+        $webhooks = Webhook::recent()->orderBy('created_at', 'desc')->get();
+        
+        $statistics = [
+            'total' => Webhook::count(),
+            'today' => Webhook::today()->count(),
+            'last_hour' => Webhook::lastHour()->count(),
+            'status' => 'Online'
+        ];
+
+        return view('dashboard', compact('webhooks', 'statistics'));
+    }
+
+    // Recebe chamadas webhook (POST e PUT)
+    public function receive(Request $request)
+    {
+        // Captura todos os dados da requisição
+        $webhook = Webhook::create([
+            'method' => $request->method(),
+            'url' => $request->fullUrl(),
+            'ip_address' => $request->ip(),
+            'size' => strlen($request->getContent()),
+            'headers' => $request->headers->all(),
+            'body' => $request->getContent()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Webhook recebido com sucesso',
+            'id' => $webhook->id,
+            'timestamp' => $webhook->created_at
+        ], 200);
+    }
+
+    // API para buscar webhooks (para atualização em tempo real)
+    public function getWebhooks(Request $request)
+    {
+        $webhooks = Webhook::recent()
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $statistics = [
+            'total' => Webhook::count(),
+            'today' => Webhook::today()->count(),
+            'last_hour' => Webhook::lastHour()->count(),
+            'status' => 'Online'
+        ];
+
+        return response()->json([
+            'webhooks' => $webhooks,
+            'statistics' => $statistics
+        ]);
+    }
+
+    // Limpa todos os webhooks
+    public function clear()
+    {
+        $count = Webhook::count();
+        Webhook::truncate();
+        
+        return response()->json([
+            'success' => true,
+            'message' => "{$count} webhooks foram removidos com sucesso"
+        ]);
+    }
+
+    // Simula uma chamada webhook
+    public function simulate(Request $request)
+    {
+        $testData = [
+            'test' => true,
+            'message' => 'Esta é uma chamada webhook simulada',
+            'timestamp' => now(),
+            'data' => [
+                'user_id' => rand(1, 100),
+                'action' => 'test_webhook',
+                'payload' => fake()->sentence()
+            ]
+        ];
+
+        // Faz uma chamada HTTP para o próprio endpoint webhook
+        $url = url('/webhook');
+        
+        try {
+            $response = Http::post($url, $testData);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Webhook simulado enviado com sucesso',
+                'response_status' => $response->status()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao simular webhook: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Detalhes de um webhook específico
+    public function show($id)
+    {
+        $webhook = Webhook::findOrFail($id);
+        return response()->json($webhook);
+    }
+}
