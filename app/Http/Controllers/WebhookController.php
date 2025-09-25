@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Webhook;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class WebhookController extends Controller
 {
@@ -36,6 +37,9 @@ class WebhookController extends Controller
             'headers' => $request->headers->all(),
             'body' => $request->getContent()
         ]);
+
+        // Executa limpeza automática se necessário
+        $this->cleanupOldWebhooks();
 
         return response()->json([
             'success' => true,
@@ -115,5 +119,21 @@ class WebhookController extends Controller
     {
         $webhook = Webhook::findOrFail($id);
         return response()->json($webhook);
+    }
+
+    /**
+     * Limpa webhooks antigos quando o limite é atingido
+     * Mantém apenas os 1000 webhooks mais recentes quando ultrapassa 1500
+     */
+    private function cleanupOldWebhooks()
+    {
+        $totalWebhooks = Webhook::count();
+        
+        if ($totalWebhooks > 1500) {
+            $removedCount = Webhook::keepLatest(1000);
+            
+            // Log da ação para debug (opcional)
+            Log::info("Limpeza automática executada: {$removedCount} webhooks antigos foram removidos. Total atual: " . ($totalWebhooks - $removedCount));
+        }
     }
 }

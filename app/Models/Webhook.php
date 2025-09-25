@@ -60,4 +60,26 @@ class Webhook extends Model
         
         return round($bytes, $precision) . ' ' . $units[$i];
     }
+
+    /**
+     * Remove os webhooks mais antigos, mantendo apenas os N mais recentes
+     */
+    public static function keepLatest($keepCount = 1000)
+    {
+        $total = static::count();
+        
+        if ($total > $keepCount) {
+            $removeCount = $total - $keepCount;
+            
+            $oldestIds = static::orderBy('created_at', 'asc')
+                ->limit($removeCount)
+                ->pluck('id');
+            
+            static::whereIn('id', $oldestIds)->delete();
+            
+            return $removeCount;
+        }
+        
+        return 0;
+    }
 }
