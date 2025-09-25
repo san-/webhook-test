@@ -37,10 +37,15 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-            'transaction_mode' => 'DEFERRED',
+            'busy_timeout' => env('DB_BUSY_TIMEOUT', 30000), // 30 segundos para evitar travamentos
+            'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'), // Write-Ahead Logging para melhor performance
+            'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'), // Balance entre performance e segurança
+            'transaction_mode' => 'IMMEDIATE', // Evita deadlocks
+            'options' => [
+                PDO::ATTR_TIMEOUT => 30, // Timeout de conexão
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ],
         ],
 
         'mysql' => [
@@ -56,11 +61,20 @@ return [
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
+            'strict' => false, // Menos restritivo para evitar erros em hosts limitados
+            'engine' => 'InnoDB',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_TIMEOUT => 30, // Timeout de conexão
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''))",
+                PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
             ]) : [],
+            // Pool de conexões para hosts compartilhados
+            'pool' => [
+                'min_connections' => 1,
+                'max_connections' => env('DB_MAX_CONNECTIONS', 10),
+            ],
         ],
 
         'mariadb' => [

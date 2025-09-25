@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    'default' => env('CACHE_STORE', 'file'), // Mudado para file para reduzir carga no DB
 
     /*
     |--------------------------------------------------------------------------
