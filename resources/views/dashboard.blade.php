@@ -588,8 +588,6 @@
             }
         });
 
-        }
-
         function clearAll() {
             if (confirm('Tem certeza que deseja limpar todos os webhooks? Esta ação não pode ser desfeita.')) {
                 fetch('/api/webhooks/clear', {
