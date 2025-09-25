@@ -77,9 +77,6 @@
                         <button class="btn btn-outline-light btn-sm" onclick="generateUrls()">
                             <i class="fas fa-cog me-1"></i> Gerenciar URLs
                         </button>
-                        <button class="btn btn-primary btn-sm" onclick="simulateWebhook()">
-                            <i class="fas fa-paper-plane me-1"></i> Simular Webhook
-                        </button>
                         <button class="btn btn-outline-danger btn-sm" onclick="clearAll()">
                             <i class="fas fa-trash me-1"></i> Limpar Tudo
                         </button>
@@ -231,8 +228,37 @@
                         <div id="request-details">
                             @if(count($webhooks) > 0)
                                 @php $firstWebhook = $webhooks->first(); @endphp
+                                
+                                <!-- Informações do Host Cliente -->
                                 <div class="request-details p-3 mb-3">
-                                    <h6>Informações da Requisição</h6>
+                                    <h6><i class="fas fa-server me-2"></i>Informações do Host Cliente</h6>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>IP de Origem:</strong> <code>{{ $firstWebhook->ip_address }}</code></p>
+                                            @if(isset($firstWebhook->headers['_client_info']['server_name']))
+                                                <p><strong>Nome do Servidor:</strong> {{ $firstWebhook->headers['_client_info']['server_name'] }}</p>
+                                            @endif
+                                            @if(isset($firstWebhook->headers['_client_info']['remote_port']))
+                                                <p><strong>Porta Remota:</strong> {{ $firstWebhook->headers['_client_info']['remote_port'] }}</p>
+                                            @endif
+                                        </div>
+                                        <div class="col-md-6">
+                                            @if(isset($firstWebhook->headers['_client_info']['request_scheme']))
+                                                <p><strong>Protocolo:</strong> <span class="badge bg-{{ $firstWebhook->headers['_client_info']['request_scheme'] === 'https' ? 'success' : 'warning' }}">{{ strtoupper($firstWebhook->headers['_client_info']['request_scheme']) }}</span></p>
+                                            @endif
+                                            @if(isset($firstWebhook->headers['user-agent'][0]))
+                                                <p><strong>User Agent:</strong> <small class="text-muted">{{ Str::limit($firstWebhook->headers['user-agent'][0], 50) }}</small></p>
+                                            @endif
+                                            @if(isset($firstWebhook->headers['host'][0]))
+                                                <p><strong>Host Requisitado:</strong> {{ $firstWebhook->headers['host'][0] }}</p>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Informações da Requisição -->
+                                <div class="request-details p-3 mb-3">
+                                    <h6><i class="fas fa-info-circle me-2"></i>Informações da Requisição</h6>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <p><strong>Método:</strong> <span class="badge bg-{{ $firstWebhook->method === 'POST' ? 'success' : 'warning' }}">{{ $firstWebhook->method }}</span></p>
@@ -240,19 +266,23 @@
                                             <p><strong>Data:</strong> {{ $firstWebhook->created_at->format('d/m/Y, H:i:s') }}</p>
                                         </div>
                                         <div class="col-md-6">
-                                            <p><strong>Host de Origem:</strong> {{ $firstWebhook->ip_address }}</p>
                                             <p><strong>Tamanho:</strong> {{ $firstWebhook->formatted_size }}</p>
                                             <p><strong>Tempo de Resposta:</strong> <span class="text-success">{{ number_format($firstWebhook->created_at->diffInMilliseconds(now())) }}ms</span></p>
+                                            @if(isset($firstWebhook->headers['content-type'][0]))
+                                                <p><strong>Content-Type:</strong> <code>{{ $firstWebhook->headers['content-type'][0] }}</code></p>
+                                            @endif
                                         </div>
                                     </div>
                                     <p><strong>URL:</strong> <code>{{ $firstWebhook->url }}</code></p>
                                 </div>
 
                                 <div class="request-details p-3 mb-3">
-                                    <h6>Headers</h6>
+                                    <h6><i class="fas fa-list me-2"></i>Headers</h6>
                                     <div class="json-content">
                                         @foreach($firstWebhook->headers as $key => $value)
-                                            <div><strong>{{ $key }}:</strong> {{ is_array($value) ? implode(', ', $value) : $value }}</div>
+                                            @if($key !== '_client_info')
+                                                <div><strong>{{ $key }}:</strong> {{ is_array($value) ? implode(', ', $value) : $value }}</div>
+                                            @endif
                                         @endforeach
                                     </div>
                                 </div>
@@ -440,18 +470,33 @@
                 second: '2-digit'
             });
 
-            // Extrair host da URL para exibição adicional se necessário
-            let urlHost = '';
-            try {
-                const url = new URL(webhook.url);
-                urlHost = url.hostname;
-            } catch (e) {
-                urlHost = 'N/A';
-            }
+            // Extrair informações do cliente dos headers
+            const clientInfo = webhook.headers._client_info || {};
+            const userAgent = webhook.headers['user-agent'] ? (Array.isArray(webhook.headers['user-agent']) ? webhook.headers['user-agent'][0] : webhook.headers['user-agent']) : '';
+            const hostHeader = webhook.headers['host'] ? (Array.isArray(webhook.headers['host']) ? webhook.headers['host'][0] : webhook.headers['host']) : '';
+            const contentType = webhook.headers['content-type'] ? (Array.isArray(webhook.headers['content-type']) ? webhook.headers['content-type'][0] : webhook.headers['content-type']) : '';
 
             const detailsHTML = `
+                <!-- Informações do Host Cliente -->
                 <div class="request-details p-3 mb-3">
-                    <h6>Informações da Requisição</h6>
+                    <h6><i class="fas fa-server me-2"></i>Informações do Host Cliente</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>IP de Origem:</strong> <code>${webhook.ip_address}</code></p>
+                            ${clientInfo.server_name ? `<p><strong>Nome do Servidor:</strong> ${clientInfo.server_name}</p>` : ''}
+                            ${clientInfo.remote_port ? `<p><strong>Porta Remota:</strong> ${clientInfo.remote_port}</p>` : ''}
+                        </div>
+                        <div class="col-md-6">
+                            ${clientInfo.request_scheme ? `<p><strong>Protocolo:</strong> <span class="badge bg-${clientInfo.request_scheme === 'https' ? 'success' : 'warning'}">${clientInfo.request_scheme.toUpperCase()}</span></p>` : ''}
+                            ${userAgent ? `<p><strong>User Agent:</strong> <small class="text-muted">${userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent}</small></p>` : ''}
+                            ${hostHeader ? `<p><strong>Host Requisitado:</strong> ${hostHeader}</p>` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações da Requisição -->
+                <div class="request-details p-3 mb-3">
+                    <h6><i class="fas fa-info-circle me-2"></i>Informações da Requisição</h6>
                     <div class="row">
                         <div class="col-md-6">
                             <p><strong>Método:</strong> <span class="badge bg-${webhook.method === 'POST' ? 'success' : 'warning'}">${webhook.method}</span></p>
@@ -459,12 +504,12 @@
                             <p><strong>Data:</strong> ${formattedDate}</p>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>Host de Origem:</strong> ${webhook.ip_address}</p>
                             <p><strong>Tamanho:</strong> ${formatBytes(webhook.size)}</p>
                             <p><strong>Tempo de Resposta:</strong> <span class="text-success">${Math.abs(Date.now() - new Date(webhook.created_at).getTime())}ms</span></p>
+                            ${contentType ? `<p><strong>Content-Type:</strong> <code>${contentType}</code></p>` : ''}
                         </div>
                     </div>
-                    <p><strong>URL Chamada:</strong> <code>${webhook.url}</code></p>
+                    <p><strong>URL:</strong> <code>${webhook.url}</code></p>
                     ${webhook.read_at ? `<p><strong>Lido em:</strong> <small class="text-info">${new Date(webhook.read_at).toLocaleDateString('pt-BR', {
                         day: '2-digit',
                         month: '2-digit',
@@ -476,17 +521,19 @@
                 </div>
 
                 <div class="request-details p-3 mb-3">
-                    <h6>Headers</h6>
+                    <h6><i class="fas fa-list me-2"></i>Headers</h6>
                     <div class="json-content">
                         ${Object.entries(webhook.headers).map(([key, value]) => {
+                            // Pular informações do cliente já exibidas na seção específica
+                            if (key === '_client_info') return '';
                             const displayValue = Array.isArray(value) ? value.join(', ') : value;
                             return `<div><strong>${key}:</strong> ${displayValue}</div>`;
-                        }).join('')}
+                        }).filter(item => item !== '').join('')}
                     </div>
                 </div>
 
                 <div class="request-details p-3">
-                    <h6>Request Content</h6>
+                    <h6><i class="fas fa-code me-2"></i>Request Content</h6>
                     <div class="json-content" id="request-content">
                         ${webhook.body || 'Nenhum conteúdo'}
                     </div>
@@ -541,28 +588,6 @@
             }
         });
 
-        // Action functions
-        function simulateWebhook() {
-            fetch('/api/webhooks/simulate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Webhook simulado enviado com sucesso!');
-                    setTimeout(refreshWebhooks, 1000);
-                } else {
-                    alert('Erro ao simular webhook: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro:', error);
-                alert('Erro ao simular webhook');
-            });
         }
 
         function clearAll() {

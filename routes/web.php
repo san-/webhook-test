@@ -13,4 +13,3 @@ Route::match(['post', 'put'], '/webhook', [WebhookController::class, 'receive'])
 Route::get('/api/webhooks', [WebhookController::class, 'getWebhooks'])->name('api.webhooks');
 Route::get('/api/webhooks/{id}', [WebhookController::class, 'show'])->name('api.webhook.show');
 Route::post('/api/webhooks/clear', [WebhookController::class, 'clear'])->name('api.webhooks.clear');
-Route::post('/api/webhooks/simulate', [WebhookController::class, 'simulate'])->name('api.webhooks.simulate');

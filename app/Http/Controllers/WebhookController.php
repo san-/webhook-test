@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Webhook;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class WebhookController extends Controller
@@ -28,13 +27,13 @@ class WebhookController extends Controller
     // Recebe chamadas webhook (POST e PUT)
     public function receive(Request $request)
     {
-        // Captura todos os dados da requisição
+        // Captura todos os dados da requisição incluindo informações detalhadas do cliente
         $webhook = Webhook::create([
             'method' => $request->method(),
             'url' => $request->fullUrl(),
             'ip_address' => $this->getRealIpAddress($request),
             'size' => strlen($request->getContent()),
-            'headers' => $request->headers->all(),
+            'headers' => $this->getEnhancedHeaders($request),
             'body' => $request->getContent()
         ]);
 
@@ -79,39 +78,6 @@ class WebhookController extends Controller
             'success' => true,
             'message' => "{$count} webhooks foram removidos com sucesso"
         ]);
-    }
-
-    // Simula uma chamada webhook
-    public function simulate(Request $request)
-    {
-        $testData = [
-            'test' => true,
-            'message' => 'Esta é uma chamada webhook simulada',
-            'timestamp' => now(),
-            'data' => [
-                'user_id' => rand(1, 100),
-                'action' => 'test_webhook',
-                'payload' => fake()->sentence()
-            ]
-        ];
-
-        // Faz uma chamada HTTP para o próprio endpoint webhook
-        $url = url('/webhook');
-        
-        try {
-            $response = Http::post($url, $testData);
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Webhook simulado enviado com sucesso',
-                'response_status' => $response->status()
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erro ao simular webhook: ' . $e->getMessage()
-            ], 500);
-        }
     }
 
     // Detalhes de um webhook específico
@@ -175,5 +141,35 @@ class WebhookController extends Controller
 
         // Se não encontrou IP válido, usar o padrão
         return $request->ip();
+    }
+
+    /**
+     * Captura headers padrão + informações detalhadas do cliente
+     */
+    private function getEnhancedHeaders($request)
+    {
+        $headers = $request->headers->all();
+        
+        // Adicionar informações específicas do cliente se disponíveis
+        $clientInfo = [
+            'client_ip' => $this->getRealIpAddress($request),
+            'server_name' => $request->server('SERVER_NAME'),
+            'server_port' => $request->server('SERVER_PORT'),
+            'request_time' => $request->server('REQUEST_TIME'),
+            'request_method' => $request->server('REQUEST_METHOD'),
+            'query_string' => $request->server('QUERY_STRING'),
+            'document_root' => $request->server('DOCUMENT_ROOT'),
+            'request_uri' => $request->server('REQUEST_URI'),
+            'script_name' => $request->server('SCRIPT_NAME'),
+            'remote_port' => $request->server('REMOTE_PORT'),
+            'request_scheme' => $request->server('REQUEST_SCHEME') ?: ($request->isSecure() ? 'https' : 'http'),
+        ];
+
+        // Adicionar informações do cliente nas seções apropriadas
+        $headers['_client_info'] = array_filter($clientInfo, function($value) {
+            return !is_null($value) && $value !== '';
+        });
+
+        return $headers;
     }
 }
