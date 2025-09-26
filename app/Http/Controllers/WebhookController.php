@@ -101,8 +101,8 @@ class WebhookController extends Controller
     {
         $totalWebhooks = Webhook::count();
         
-        if ($totalWebhooks > 1500) {
-            $removedCount = Webhook::keepLatest(1000);
+        if ($totalWebhooks > 500) {
+            $removedCount = Webhook::keepLatest(300);
             
             // Log da ação para debug (opcional)
             Log::info("Limpeza automática executada: {$removedCount} webhooks antigos foram removidos. Total atual: " . ($totalWebhooks - $removedCount));
