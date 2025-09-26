@@ -13,12 +13,22 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [
-		8080
+		8000
 	],
+	"portsAttributes": {
+		"8000": {
+			"label": "Webhook Listener",
+			"onAutoForward": "openBrowser"
+		}
+	},
 	"features": {
-		"ghcr.io/devcontainers-extra/features/composer:1": {}
-	}
-
+		"ghcr.io/devcontainers-extra/features/composer:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker": {}
+	},
+	"runArgs": [
+		"-p",
+		"8000:8000"
+	]
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "sudo chmod a+x \"$(pwd)\" && sudo rm -rf /var/www/html && sudo ln -s \"$(pwd)\" /var/www/html"
 
